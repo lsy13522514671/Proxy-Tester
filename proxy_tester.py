@@ -20,15 +20,15 @@ def format_proxy(proxy):
 
 def ping_proxy(proxy_format, url):
     info_format = dict.fromkeys(["status", "code", "latency"])
+    proxy_format = "http://{}:{}@{}".format(proxy_format['username'], proxy_format['password'], proxy_format['ip'])
     proxy = {
-        'http': proxy_format['ip'],
-        'https': proxy_format['ip']
+        'http': proxy_format,
+        'https': proxy_format
     }
 
-    auth = HTTPProxyAuth(proxy_format['username'], proxy_format['password'])
     try:
         start_time = time.time()
-        res = requests.get(url, proxies=proxy, auth=auth, timeout=5)
+        res = requests.get(url, proxies=proxy, timeout=5)
         end_time = time.time()
         if res.status_code // 100 == 2:
             info_format['status'] = True
@@ -110,7 +110,9 @@ def main():
         url = str(input("Please Give An URL To Test:"))
         if not validators.url(url):
             print("Invalid URL! Please Try Again!\n")
+            print("\n")
         else:
+            print("\n")
             break
 
     while True:
@@ -124,6 +126,8 @@ def main():
                     write_proxy_status(proxy_list, proxy_file)
                 else:
                     print("Wrong Proxy List Format: "+proxy_file+"\n")
+            print("\n")
+            main()
         elif(option == 2):
             file_name=str(input("Please Enter The File Name With Suffix (For Example, file.txt): \n"))
             if(proxy_files.count(file_name)>0):
@@ -132,6 +136,8 @@ def main():
                 write_proxy_status(proxy_list, file_name)
             else:
                 print("File Does not Exist, Please Try Again! \n")
+            print("\n")
+            main()
         elif(option == 3):
             print("\n")
             main()
