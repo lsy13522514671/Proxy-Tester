@@ -7,7 +7,7 @@ import sys
 
 # PREQUISITE
 # needs to have python 3 installed
-# needs to install the above modules to run the program to run the program, to install the modules run: pip install requests time os glob validators sys
+# needs to install the above modules to run the program to run the program, to install the modules run: pip install requests validators 
 
 # HOW TO RUN:
 # write your proxy lists as text files, e.g, proxy_list_name_1.txt, proxy_list_name_2.txt, my_proxy.txt, and etc.
@@ -15,7 +15,7 @@ import sys
 # simply enter: python proxy_tester.py
 # proxy will be shuffled and output as text files (one for each proxy list you enterred) in shuffled folder
 # proxy status will be recorded and output as a text file (one for each proxy list you enterred) in shuffled folder
-# IF YOU DO NOT SEE AN EXPECTED OUTPUT FILE, CHECK THE FORMAT OF EACH PROXY IN THAT FILE
+# IF YOU DO NOT SEE AN EXPECTED OUTPUT PROXY LIST, CHECK THE CORRESPOND INPUT FILE!(THE RESON IS THAT IT CONTAINS A PROXY WITH WRONG FORMAT)
 
 # formats a proxy, which is a text line, into a dictionary 
 # with the following key: 
