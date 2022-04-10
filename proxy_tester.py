@@ -1,12 +1,20 @@
 import requests
-from requests.auth import HTTPProxyAuth
 import time
 import os
 import glob
 import validators
 import sys
 
+# you need to have python 3 installed
+# you need to install the above modules to run the program, to run the program: pip install requests time os glob validators sys
+# to run the program, simply enter: python proxy_tester.py
 
+# formats a proxy, which is a text line, into a dictionary 
+# with the following key: 
+# 1. ip(host:port)
+# 2. username
+# 3. password
+# if the given proxy is in wrong format, returns false
 def format_proxy(proxy):
     proxy_format = dict.fromkeys(["ip", "username", "password"])
     p_list = proxy.split(":")
@@ -17,7 +25,15 @@ def format_proxy(proxy):
     proxy_format['password'] = p_list[3]
     return proxy_format
 
-
+# uses a formatted proxy to send request to a given url
+# there are three situations in general: 
+#    success (with success status code 200)
+#    failure (with a response: with error status code, e.g. 407 as below)
+#    failure (with an error: a serious problem occurs)
+# returns a response information correspond to the proxy:
+# 1. status(a boolean value)
+# 2. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
+# 3. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
 def ping_proxy(proxy_format, url):
     info_format = dict.fromkeys(["status", "code", "latency"])
     proxy_format = "http://{}:{}@{}".format(proxy_format['username'], proxy_format['password'], proxy_format['ip'])
@@ -45,7 +61,12 @@ def ping_proxy(proxy_format, url):
         info_format['latency'] = "none"
         return info_format
 
-
+# reads all proxy to a list in the format of a dictionary with keys:
+# 1. proxy: the actual proxy informat of: host:port:username:password
+# 2. status(a boolean value)
+# 3. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
+# 4. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
+# if the proxy format is wrong, stops reading process
 def read_proxy_to_lib(file_path, url):
     proxy_list = []
     proxy_file = open(file_path, "r")
@@ -69,7 +90,9 @@ def read_proxy_to_lib(file_path, url):
             return False
     return proxy_list
 
-
+# shuffles the good proxy (only keeps proxies with good status)
+# writes them to a file under the shuffled folder
+# the file name is shuffle_file_name.txt
 def shuffle_good_proxy(list, file_name):
     os.chdir("./shuffled")
     file = open("shuffled_"+file_name, "w")
@@ -80,7 +103,10 @@ def shuffle_good_proxy(list, file_name):
     file.close()
     os.chdir("../")
 
-
+# retrieves status for every proxy
+# writes them to a file under the status folder
+# the format is ip(host:port:username:password)----status(good or bd):error code----latency(in ms or none if error occurs)
+# the file name is status_file_name.txt
 def write_proxy_status(list, file_name):
     os.chdir("./status")
     file = open("status_"+file_name, "w")
@@ -98,7 +124,7 @@ def write_proxy_status(list, file_name):
     file.close()
     os.chdir("../")
 
-
+# the main function that infinitely asks for input
 def main():
     folders = ["shuffled", "status"]
     for folder in folders:
@@ -107,8 +133,12 @@ def main():
     proxy_files = glob.glob('*.txt')
 
     while True:
-        url = str(input("Please Give An URL To Test:"))
-        if not validators.url(url):
+        url = str(input("Enter q To Quit Or Please Give An URL To Test: \n"))
+        if url=="q":
+            print("\n")
+            print("Successfully Quitted!\n")
+            sys.exit(0)
+        elif not validators.url(url):
             print("Invalid URL! Please Try Again!\n")
             print("\n")
         else:
@@ -118,6 +148,8 @@ def main():
     while True:
         option = int(input(
             "Please Select An Option Below: \n 1. Test All Proxy Lists \n 2. Test A Specific Proxy List \n 3. Reset URL \n 4. Quit Application \n Your Option: \n"))
+        # tests all proxy lists: shuffles each proxy list, and retrieves proxy status for every proxy
+        # if the reading process fail (a wrong proxy format is detected), prints the error file name
         if(option == 1):
             for proxy_file in proxy_files:
                 proxy_list = read_proxy_to_lib(proxy_file, url)
@@ -125,26 +157,36 @@ def main():
                     shuffle_good_proxy(proxy_list, proxy_file)
                     write_proxy_status(proxy_list, proxy_file)
                 else:
+                    # prints the error file name
                     print("Wrong Proxy List Format: "+proxy_file+"\n")
             print("\n")
             main()
+        # tests a specified proxy lists: shuffles each proxy list, and retrieves proxy status for every proxy
+        # a name must include the suffix
+        # if the reading process fail (a wrong proxy format is detected), prints the error file name
         elif(option == 2):
             file_name=str(input("Please Enter The File Name With Suffix (For Example, file.txt): \n"))
             if(proxy_files.count(file_name)>0):
                 proxy_list = read_proxy_to_lib(file_name, url)
-                shuffle_good_proxy(proxy_list, file_name)
-                write_proxy_status(proxy_list, file_name)
+                if proxy_list:
+                    shuffle_good_proxy(proxy_list, file_name)
+                    write_proxy_status(proxy_list, file_name)
+                else:
+                    print("Wrong Proxy List Format: "+file_name+"\n")
             else:
                 print("File Does not Exist, Please Try Again! \n")
             print("\n")
             main()
+        # resets the URL and repeat the process
         elif(option == 3):
             print("\n")
             main()
+        # quits the tester application
         elif(option == 4):
             print("\n")
             print("Successfully Quitted!\n")
             sys.exit(0)
+        # invalid input
         else:
             print("Invalid Input! Please Try Again!\n")
         print("\n")
@@ -152,13 +194,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-# if __name__ == '__main__':
-#     url = "http://www.google.com"
-#     folders = ["shuffled", "status"]
-#     for folder in folders:
-#         if not os.path.isdir(folder):
-#             os.mkdir(folder)
-#     proxy_list = read_proxy_to_lib('good.txt', url)
-#     print(proxy_list)
-#     shuffle_good_proxy(proxy_list, 'good.txt')
-#     write_proxy_status(proxy_list, 'good.txt')
