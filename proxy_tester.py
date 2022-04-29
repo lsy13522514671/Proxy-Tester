@@ -4,6 +4,7 @@ import os
 import glob
 import validators
 import sys
+import concurrent.futures
 
 # PREQUISITE
 # needs to have python 3 installed
@@ -17,13 +18,15 @@ import sys
 # proxy status will be recorded and output as a text file (one for each proxy list you enterred) in shuffled folder
 # IF YOU DO NOT SEE AN EXPECTED OUTPUT PROXY LIST, CHECK THE CORRESPOND INPUT FILE!(THE RESON IS THAT IT CONTAINS A PROXY WITH WRONG FORMAT)
 
-# formats a proxy, which is a text line, into a dictionary 
-# with the following key: 
-# 1. ip(host:port)
-# 2. username
-# 3. password
-# if the given proxy is in wrong format, returns false
 def format_proxy(proxy):
+    """
+    formats a proxy, which is a text line, into a dictionary 
+    with the following key: 
+    1. ip(host:port)
+    2. username
+    3. password
+    if the given proxy is in wrong format, returns false
+    """
     proxy_format = dict.fromkeys(["ip", "username", "password"])
     p_list = proxy.split(":")
     if(len(p_list) != 4):
@@ -33,16 +36,18 @@ def format_proxy(proxy):
     proxy_format['password'] = p_list[3]
     return proxy_format
 
-# uses a formatted proxy to send request to a given url
-# there are three situations in general: 
-#    success (with success status code 200)
-#    failure (with a response: with error status code, e.g. 407 as below)
-#    failure (with an error: a serious problem occurs)
-# returns a response information correspond to the proxy:
-# 1. status(a boolean value)
-# 2. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
-# 3. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
 def ping_proxy(proxy_format, url):
+    """
+    uses a formatted proxy to send request to a given url
+    there are three situations in general: 
+       success (with success status code 200)
+       failure (with a response: with error status code, e.g. 407 as below)
+       failure (with an error: a serious problem occurs)
+    returns a response information correspond to the proxy:
+    1. status(a boolean value)
+    2. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
+    3. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
+    """
     info_format = dict.fromkeys(["status", "code", "latency"])
     proxy_format = "http://{}:{}@{}".format(proxy_format['username'], proxy_format['password'], proxy_format['ip'])
     proxy = {
@@ -69,39 +74,47 @@ def ping_proxy(proxy_format, url):
         info_format['latency'] = "none"
         return info_format
 
-# reads all proxy to a list in the format of a dictionary with keys:
-# 1. proxy: the actual proxy informat of: host:port:username:password
-# 2. status(a boolean value)
-# 3. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
-# 4. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
-# if the proxy format is wrong, stops reading process
+def ping_one_proxy(proxy, url):
+    """
+    created for the multi-processing. The function takes one proxy, and a testing url.
+    It first checks the proxy format.
+    If the format is correct, it pings the proxy. Otherwise, it returns a proxy information
+    format as the ping_proxy, except the error code is "wrong format".
+    """
+    cleaned_proxy = proxy.rstrip('\n')
+    r = format_proxy(cleaned_proxy)
+    proxy_info = dict.fromkeys(["proxy"])
+    proxy_info['proxy'] = cleaned_proxy
+    if r!=False:
+        res = ping_proxy(r, url)
+        proxy_info.update(res)
+    else:
+        proxy_info['status'] = False
+        proxy_info['code'] = "wrong format"
+        proxy_info['latency'] = "none"
+    return proxy_info
+
 def read_proxy_to_lib(file_path, url):
-    proxy_list = []
+    """
+    uses 50 threads to reads all proxy to a list in the format of a dictionary with keys:
+    1. proxy: the actual proxy informat of: host:port:username:password
+    2. status(a boolean value)
+    3. code(success code 2xx, or error code (e.g. 407: authentication fail), or a proxy error(a serious problem: e.g., proxy error)),
+    4. latency (specific value in ms: if the proxy works on that url, or none if an error occurs)
+    if the proxy format is wrong, stops reading process
+    """
     proxy_file = open(file_path, "r")
     proxies = proxy_file.readlines()
-    line_length = len(proxies)
-    line_num = 0
-    for proxy in proxies:
-        if(line_num < line_length-1):
-            cleaned_proxy = proxy[:-1]
-            line_num += 1
-        else:
-            cleaned_proxy = proxy
-        r = format_proxy(cleaned_proxy)
-        if(r):
-            proxy_info = dict.fromkeys(["proxy"])
-            res = ping_proxy(r, url)
-            proxy_info['proxy'] = cleaned_proxy
-            proxy_info.update(res)
-            proxy_list.append(proxy_info)
-        else:
-            return False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        proxy_list = list(executor.map(lambda proxy: ping_one_proxy(proxy, url), proxies))
     return proxy_list
 
-# shuffles the good proxy (only keeps proxies with good status)
-# writes them to a file under the shuffled folder
-# the file name is shuffle_file_name.txt
 def shuffle_good_proxy(list, file_name):
+    """
+    shuffles the good proxy (only keeps proxies with good status)
+    writes them to a file under the shuffled folder
+    the file name is shuffle_file_name.txt
+    """
     os.chdir("./shuffled")
     file = open("shuffled_"+file_name, "w")
     for proxy in list:
@@ -111,11 +124,13 @@ def shuffle_good_proxy(list, file_name):
     file.close()
     os.chdir("../")
 
-# retrieves status for every proxy
-# writes them to a file under the status folder
-# the format is ip(host:port:username:password)----status(good or bd):error code----latency(in ms or none if error occurs)
-# the file name is status_file_name.txt
 def write_proxy_status(list, file_name):
+    """
+    retrieves status for every proxy
+    writes them to a file under the status folder
+    the format is ip(host:port:username:password)----status(good or bd):error code----latency(in ms or none if error occurs)
+    the file name is status_file_name.txt
+    """
     os.chdir("./status")
     file = open("status_"+file_name, "w")
     for proxy in list:
@@ -124,16 +139,18 @@ def write_proxy_status(list, file_name):
         if(proxy['status']):
             file.write("good")
         else:
-            file.write("bad")
-            file.write("-error-code:" + str(proxy['code']))
+            file.write("bad:")
+            file.write(str(proxy['code']))
         file.write("----")
         file.write(proxy['latency'])
         file.write("\n")
     file.close()
     os.chdir("../")
 
-# the main function that infinitely asks for input
 def main():
+    """
+    the main function that infinitely asks for input
+    """
     folders = ["shuffled", "status"]
     for folder in folders:
         if not os.path.isdir(folder):
@@ -161,12 +178,8 @@ def main():
         if(option == 1):
             for proxy_file in proxy_files:
                 proxy_list = read_proxy_to_lib(proxy_file, url)
-                if proxy_list:
-                    shuffle_good_proxy(proxy_list, proxy_file)
-                    write_proxy_status(proxy_list, proxy_file)
-                else:
-                    # prints the error file name
-                    print("Wrong Proxy List Format: "+proxy_file+"\n")
+                shuffle_good_proxy(proxy_list, proxy_file)
+                write_proxy_status(proxy_list, proxy_file)
             print("\n")
             main()
         # tests a specified proxy lists: shuffles each proxy list, and retrieves proxy status for every proxy
@@ -176,11 +189,8 @@ def main():
             file_name=str(input("Please Enter The File Name With Suffix (For Example, file.txt): \n"))
             if(proxy_files.count(file_name)>0):
                 proxy_list = read_proxy_to_lib(file_name, url)
-                if proxy_list:
-                    shuffle_good_proxy(proxy_list, file_name)
-                    write_proxy_status(proxy_list, file_name)
-                else:
-                    print("Wrong Proxy List Format: "+file_name+"\n")
+                shuffle_good_proxy(proxy_list, file_name)
+                write_proxy_status(proxy_list, file_name)
             else:
                 print("File Does not Exist, Please Try Again! \n")
             print("\n")
