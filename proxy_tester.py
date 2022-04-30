@@ -84,7 +84,10 @@ def ping_one_proxy(proxy, url):
     cleaned_proxy = proxy.rstrip('\n')
     r = format_proxy(cleaned_proxy)
     proxy_info = dict.fromkeys(["proxy"])
-    proxy_info['proxy'] = cleaned_proxy
+    if cleaned_proxy == "" or cleaned_proxy.isspace():
+        proxy_info['proxy'] = "empty line"
+    else:
+        proxy_info['proxy'] = cleaned_proxy
     if r!=False:
         res = ping_proxy(r, url)
         proxy_info.update(res)
