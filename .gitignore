@@ -3,3 +3,4 @@ status
 bad.txt
 good.txt
 wrong_format.txt
+*.spec
